@@ -52,7 +52,10 @@ pipeline {
             archiveArtifacts artifacts: '**/target/site/**/*.*', fingerprint: true
             archiveArtifacts artifacts: '**/target/**/*.jar', fingerprint: true
             archiveArtifacts artifacts: '**/target/**/*.war', fingerprint: true
+            archiveArtifacts artifacts: '**/target/docs-core/**/*.*', fingerprint: true
             archiveArtifacts artifacts: '**/target/staging/**/*.*', fingerprint: true
+            archiveArtifacts artifacts: '**/target/docs-web/**/*.*', fingerprint: true
+            archiveArtifacts artifacts: '**/target/docs-web-common/**/*.*', fingerprint: true
             junit '**/target/surefire-reports/*.xml'
         }
     }
