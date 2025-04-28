@@ -36,7 +36,7 @@ pipeline {
                 sh 'mvn site'
             }
         }
-        stage('Site-Stage') {    // <- 这里新增
+        stage('Site-Stage') { 
             steps {
                 sh 'mvn site:stage'
             }
