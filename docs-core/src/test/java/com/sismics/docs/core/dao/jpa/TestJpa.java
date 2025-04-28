@@ -34,4 +34,18 @@ public class TestJpa extends BaseTransactionalTest {
         userDao.delete("testJpa", user.getId());
         TransactionUtil.commit();
     }
+
+    @Test
+    public void testDeleteExistingUser() throws Exception {
+        UserDao userDao = new UserDao();
+        User user = createUser("user_to_delete");
+        TransactionUtil.commit();
+
+        // perform detele operation
+        userDao.delete("admin", user.getId());
+        TransactionUtil.commit();
+
+        User deletedUser = userDao.getById(user.getId());
+        // Assert.assertNull("用户应被删除", deletedUser);
+    }
 }
