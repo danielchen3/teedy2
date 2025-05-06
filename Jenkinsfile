@@ -1,62 +1,65 @@
 pipeline {
     agent any
-    stages {
-        stage('Clean') {
-            steps {
-                sh 'mvn clean'
-            }
-        }
-        stage('Compile') {
-            steps {
-                sh 'mvn compile'
-            }
-        }
-        stage('Test') {
-            steps {
-                sh 'mvn test -Dmaven.test.failure.ignore=true'
-            }
-        }
-        stage('PMD') {
-            steps {
-                sh 'mvn pmd:pmd'
-            }
-        }
-        stage('JaCoCo') {
-            steps {
-                sh 'mvn jacoco:report'
-            }
-        }
-        stage('Javadoc') {
-            steps {
-                sh 'mvn javadoc:javadoc'
-            }
-        }
-        stage('Site') {
-            steps {
-                sh 'mvn site'
-            }
-        }
-        stage('Site-Stage') { 
-            steps {
-                sh 'mvn site:stage'
-            }
-        }
-        stage('Package') {
-            steps {
-                sh 'mvn package -DskipTests'
-            }
-        }
+
+    environment {
+        // Jenkins credentials configuration
+        DOCKER_HUB_CREDENTIALS = credentials('danielchen_dockerhub_cre') // Docker Hub credentials ID stored in Jenkins
+
+        // Docker Hub Repository's name
+        DOCKER_IMAGE = 'danielchen3/teedy2025_manual' // Your Docker Hub username and repository name
+
+        // Use build number as tag
+        DOCKER_TAG = "${env.BUILD_NUMBER}"
     }
-    post {
-        always {
-            archiveArtifacts artifacts: '**/target/site/**/*.*', fingerprint: true
-            archiveArtifacts artifacts: '**/target/**/*.jar', fingerprint: true
-            archiveArtifacts artifacts: '**/target/**/*.war', fingerprint: true
-            archiveArtifacts artifacts: '**/target/docs-core/**/*.*', fingerprint: true
-            archiveArtifacts artifacts: '**/target/staging/**/*.*', fingerprint: true
-            archiveArtifacts artifacts: '**/target/docs-web/**/*.*', fingerprint: true
-            archiveArtifacts artifacts: '**/target/docs-web-common/**/*.*', fingerprint: true
-            junit '**/target/surefire-reports/*.xml'
+
+    stages {
+        stage('Build') {
+            steps {
+                checkout scmGit(
+                    branches: [[name: '*/master']],
+                    extensions: [],
+                    userRemoteConfigs: [[url: 'https://github.com/danielchen3/teedy2.git']] // Your GitHub repository
+                )
+                sh 'mvn -B -DskipTests clean package'
+            }
+        }
+
+        stage('Building image') {
+            steps {
+                script {
+                    // Assume Dockerfile is at the root
+                    docker.build("${env.DOCKER_IMAGE}:${env.DOCKER_TAG}")
+                }
+            }
+        }
+
+        stage('Upload image') {
+            steps {
+                script {
+                    // Sign in to Docker Hub and push the image
+                    docker.withRegistry('https://registry.hub.docker.com', 'DOCKER_HUB_CREDENTIALS') {
+                        docker.image("${env.DOCKER_IMAGE}:${env.DOCKER_TAG}").push()
+                        // Optional: tag as latest
+                        docker.image("${env.DOCKER_IMAGE}:${env.DOCKER_TAG}").push('latest')
+                    }
+                }
+            }
+        }
+
+        stage('Run containers') {
+            steps {
+                script {
+                    // Stop and remove existing container if it exists
+                    sh 'docker stop teedy-container-8081 || true'
+                    sh 'docker rm teedy-container-8081 || true'
+
+                    // Run the container
+                    docker.image("${env.DOCKER_IMAGE}:${env.DOCKER_TAG}").run('--name teedy-container-8081 -d -p 8081:8080')
+
+                    // Optional: list all teedy containers
+                    sh 'docker ps --filter "name=teedy-container"'
+                }
+            }
         }
     }
 }
