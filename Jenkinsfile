@@ -2,13 +2,8 @@ pipeline {
     agent any
 
     environment {
-        // Jenkins credentials configuration
-        DOCKER_HUB_CREDENTIALS = credentials('danielchen_dockerhub_cre') // Docker Hub credentials ID stored in Jenkins
-
-        // Docker Hub Repository's name
-        DOCKER_IMAGE = 'danielchen3/teedy2025_manual' // Your Docker Hub username and repository name
-
-        // Use build number as tag
+        // Docker Hub repository
+        DOCKER_IMAGE = 'danielchen3/teedy2025_manual'
         DOCKER_TAG = "${env.BUILD_NUMBER}"
     }
 
@@ -18,45 +13,39 @@ pipeline {
                 checkout scmGit(
                     branches: [[name: '*/master']],
                     extensions: [],
-                    userRemoteConfigs: [[url: 'https://github.com/danielchen3/teedy2.git']] // Your GitHub repository
+                    userRemoteConfigs: [[url: 'https://github.com/danielchen3/teedy2.git']]
                 )
                 sh 'mvn -B -DskipTests clean package'
             }
         }
 
-        stage('Building image') {
+        stage('Build Image') {
             steps {
                 script {
-                    // Assume Dockerfile is at the root
-                    docker.build("${env.DOCKER_IMAGE}:${env.DOCKER_TAG}")
+                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
                 }
             }
         }
 
-        stage('Upload image') {
+        stage('Upload Image') {
             steps {
-                script {
-                    // Sign in to Docker Hub and push the image
-                    docker.withRegistry('https://registry.hub.docker.com', 'DOCKER_HUB_CREDENTIALS') {
-                        docker.image("${env.DOCKER_IMAGE}:${env.DOCKER_TAG}").push()
-                        // Optional: tag as latest
-                        docker.image("${env.DOCKER_IMAGE}:${env.DOCKER_TAG}").push('latest')
+                withCredentials([usernamePassword(credentialsId: 'danielchen_dockerhub_cre', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    script {
+                        docker.withRegistry('https://registry.hub.docker.com', 'danielchen_dockerhub_cre') {
+                            docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
+                            docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push('latest')
+                        }
                     }
                 }
             }
         }
 
-        stage('Run containers') {
+        stage('Run Container') {
             steps {
                 script {
-                    // Stop and remove existing container if it exists
                     sh 'docker stop teedy-container-8081 || true'
                     sh 'docker rm teedy-container-8081 || true'
-
-                    // Run the container
-                    docker.image("${env.DOCKER_IMAGE}:${env.DOCKER_TAG}").run('--name teedy-container-8081 -d -p 8081:8080')
-
-                    // Optional: list all teedy containers
+                    docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").run('--name teedy-container-8081 -d -p 8081:8080')
                     sh 'docker ps --filter "name=teedy-container"'
                 }
             }
